@@ -25,6 +25,21 @@ class Chronicle:
         self.count = 0
         os.makedirs(self.dir, exist_ok=True)
         self._load_count()
+        self._register_agent()
+
+    def _register_agent(self):
+        """Register this agent in the fleet index. No heartbeat needed."""
+        index_file = os.path.join(self.REPO_DIR, ".agents.json")
+        try:
+            with open(index_file) as f:
+                agents = json.load(f)
+        except:
+            agents = []
+        if self.name not in agents:
+            agents.append(self.name)
+            agents.sort()
+            with open(index_file, "w") as f:
+                json.dump(agents, f, indent=2)
 
     def _load_count(self):
         try:

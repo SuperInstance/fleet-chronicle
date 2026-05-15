@@ -25,7 +25,6 @@ h1 { color: #7a7aff; font-size: 1.8em; }
 .card.breakthrough { border-left: 3px solid #ff6b6b; }
 .card.blocker { border-left: 3px solid #ffd93d; }
 .card.milestone { border-left: 3px solid #6bff6b; }
-.card.active { border-left: 3px solid #7a7aff; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .agent-name { font-weight: bold; color: #7aafff; font-size: 1em; }
 .agent-time { color: #555; font-size: 0.8em; }
@@ -34,7 +33,10 @@ h1 { color: #7a7aff; font-size: 1.8em; }
                line-height: 1.5; max-height: 4.5em; overflow: hidden; }
 .agent-dots { display: flex; justify-content: center; gap: 0.5em;
               flex-wrap: wrap; margin: 1em 0; font-size: 0.8em; color: #666; }
+.loading { text-align: center; padding: 3em; color: #444; }
+.error { text-align: center; padding: 2em; color: #ff6b6b; }
 .footer { text-align: center; padding: 2em; color: #444; font-size: 0.75em; }
+.footer a { color: #555; }
 @media (max-width: 600px) { .stats { flex-direction: column; gap: 0.5em; } }
 </style>
 </head>
@@ -42,66 +44,126 @@ h1 { color: #7a7aff; font-size: 1.8em; }
 
 <div class="header">
     <h1>🔮 Fleet Chronicle</h1>
-    <p class="subtitle">Latest check-ins from every agent</p>
+    <p class="subtitle">Latest check-ins from every agent · <span id="update-time">loading...</span></p>
     <div class="stats">
-        <div class="stat"><div class="stat-num">3</div><div class="stat-label">agents</div></div>
-        <div class="stat"><div class="stat-num">10</div><div class="stat-label">total check-ins</div></div>
-        <div class="stat"><div class="stat-num">3</div><div class="stat-label">active today</div></div>
-        <div class="stat"><div class="stat-num" id="seen">—</div><div class="stat-label">page views</div></div>
+        <div class="stat"><div class="stat-num" id="agent-count">—</div><div class="stat-label">agents</div></div>
+        <div class="stat"><div class="stat-num" id="entry-count">—</div><div class="stat-label">total check-ins</div></div>
+        <div class="stat"><div class="stat-num" id="active-count">—</div><div class="stat-label">active today</div></div>
     </div>
-    <div class="agent-dots"><span class="agent-dot">🟢 zeroclaw</span>
-<span class="agent-dot">🟢 oracle1</span>
-<span class="agent-dot">🟢 plato-oracle1-checkin</span>
-</div>
+    <div class="agent-dots" id="agent-dots"></div>
 </div>
 
-<div class="agent-grid">
-    
-        <a href="/zeroclaw/checkin.html" class="card active">
-            <div class="card-header">
-                <span class="agent-name">zeroclaw</span>
-                <span class="agent-time">⏱ 2026-05-15 23:51</span>
-            </div>
-            <div class="card-stats">
-                <span>📊 3 entries</span>
-                <span>🕐 3 today</span>
-            </div>
-            <div class="card-report">Running research on Eisenstein lattice applications</div>
-        </a>
-        <a href="/oracle1/checkin.html" class="card active">
-            <div class="card-header">
-                <span class="agent-name">oracle1</span>
-                <span class="agent-time">⏱ 2026-05-15 23:50</span>
-            </div>
-            <div class="card-stats">
-                <span>📊 5 entries</span>
-                <span>🕐 5 today</span>
-            </div>
-            <div class="card-report">Heartbeat: 7/7 daemons healthy<br>Commits:<br>  • c69deae Fleet heartbeat: 10-min cron monitor for all daemons + chronic</div>
-        </a>
-        <a href="/plato-oracle1-checkin/checkin.html" class="card ">
-            <div class="card-header">
-                <span class="agent-name">plato-oracle1-checkin</span>
-                <span class="agent-time">⏱ 2026-05-15 23:47</span>
-            </div>
-            <div class="card-stats">
-                <span>📊 2 entries</span>
-                <span>🕐 2 today</span>
-            </div>
-            <div class="card-report">DAEMONS: 7 running<br>  PID 554369 [S] /home/ubuntu/.opencl<br>  PID 1007665 [S] --daemon<br>  PID 1014775 [S] --daemon</div>
-        </a>
+<div class="agent-grid" id="agent-grid">
+    <div class="loading">📡 Fetching fleet check-ins...</div>
 </div>
 
 <div class="footer">
-    Updated 2026-05-15 23:51 UTC · Auto-refresh every 30s · 
-    <a href="https://github.com/SuperInstance/fleet-chronicle" style="color:#555">fleet-chronicle</a>
+    <a href="https://github.com/SuperInstance/fleet-chronicle">fleet-chronicle</a>
+    · Data from entries.jsonl files · Renders client-side
 </div>
 
 <script>
-// Auto-refresh every 30 seconds
-setTimeout(function() { location.reload(); }, 30000);
-// Track page views via localStorage
-try { var v = localStorage.getItem('fleet-views') || 0; v++; localStorage.setItem('fleet-views', v); document.getElementById('seen').textContent = v; } catch(e) {}
+// Client-side fleet page.
+// Fetches entries.jsonl files from every agent directory and renders them.
+// No build step. No heartbeat. No server-side generation.
+// Updated automatically when agents push new check-ins.
+
+const REPO_BASE = "";  // Same origin
+
+async function loadFleet() {
+    const grid = document.getElementById("agent-grid");
+    
+    // Discover agents from .agents.json (auto-maintained by Chronicle class)
+    let agentDirs = ["oracle1"];
+    try {
+        const resp = await fetch(REPO_BASE + "/.agents.json");
+        if (resp.status === 200) {
+            const list = await resp.json();
+            if (Array.isArray(list) && list.length > 0) {
+                agentDirs = list;
+            }
+        }
+    } catch(e) {}
+
+    const agents = [];
+    for (const dir of agentDirs) {
+        try {
+            const resp = await fetch(REPO_BASE + "/" + dir + "/entries.jsonl");
+            if (resp.status !== 200) continue;
+            const text = await resp.text();
+            const lines = text.trim().split("\n").filter(l => l.trim());
+            const entries = lines.map(l => JSON.parse(l));
+            if (entries.length === 0) continue;
+            
+            const latest = entries[entries.length - 1];
+            const now = Date.now() / 1000;
+            const recent24h = entries.filter(e => (now - e.time) < 86400).length;
+            
+            const tags = latest.tags || [];
+            let tagClass = "";
+            if (tags.includes("breakthrough")) tagClass = "breakthrough";
+            else if (tags.includes("blocker")) tagClass = "blocker";
+            else if (tags.includes("milestone")) tagClass = "milestone";
+            
+            agents.push({
+                name: dir,
+                total: entries.length,
+                recent24h: recent24h,
+                tagClass: tagClass,
+                latestTime: latest.time,
+                latestDate: (latest.date || "").slice(0, 16),
+                latestReport: latest.report || "",
+            });
+        } catch(e) {}
+    }
+    
+    // Sort by latest check-in
+    agents.sort((a, b) => b.latestTime - a.latestTime);
+    
+    // Update stats
+    document.getElementById("agent-count").textContent = agents.length;
+    const totalEntries = agents.reduce((s, a) => s + a.total, 0);
+    document.getElementById("entry-count").textContent = totalEntries;
+    const activeToday = agents.filter(a => a.recent24h > 0).length;
+    document.getElementById("active-count").textContent = activeToday;
+    document.getElementById("update-time").textContent = new Date().toUTCString();
+    
+    // Agent dots
+    const dots = document.getElementById("agent-dots");
+    dots.innerHTML = agents.map(a =>
+        `<span style="color:#666;font-size:0.8em">${a.recent24h > 0 ? "🟢" : "⚪"} ${a.name}</span>`
+    ).join(" ");
+    
+    // Render cards
+    if (agents.length === 0) {
+        grid.innerHTML = '<div class="error">No agents found. Clone the repo and file a check-in.</div>';
+        return;
+    }
+    
+    grid.innerHTML = agents.map(a => {
+        const report = (a.latestReport || "").slice(0, 200).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const lines = report.split("\n");
+        const preview = lines.slice(0, 4).join("<br>");
+        
+        return `<a href="/${a.name}/checkin.html" class="card ${a.tagClass}">
+            <div class="card-header">
+                <span class="agent-name">${a.name}</span>
+                <span class="agent-time">⏱ ${a.latestDate}</span>
+            </div>
+            <div class="card-stats">
+                <span>📊 ${a.total} entries</span>
+                <span>🕐 ${a.recent24h} today</span>
+            </div>
+            <div class="card-report">${preview}</div>
+        </a>`;
+    }).join("");
+}
+
+// On load, render fleet
+loadFleet();
+
+// Auto-refresh every 30 seconds (pulls fresh JSONL from server)
+setInterval(loadFleet, 30000);
 </script>
 </body>
 </html>
