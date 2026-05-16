@@ -164,7 +164,7 @@ async function showHome() {
     window.history.pushState({}, "", "/");
 
     try {
-        const resp = await fetch("/agents.json?" + CACHE_VER);
+        const resp = await fetch("agents.json?" + CACHE_VER);
         if (!resp.ok) throw new Error("HTTP " + resp.status + " loading agents.json");
         const agents = await resp.json();
         if (!Array.isArray(agents)) throw new Error("agents.json is not an array");
@@ -176,7 +176,7 @@ async function showHome() {
 
         for (const name of agents) {
             try {
-                const r = await fetch("/" + name + "/entries.jsonl?" + CACHE_VER);
+                const r = await fetch(name + "/entries.jsonl?" + CACHE_VER);
                 if (r.status !== 200) continue;
                 const text = await r.text();
                 const entries = text.trim().split("\n").filter(l => l.trim()).map(l => JSON.parse(l));
@@ -240,7 +240,7 @@ async function showAgent(name) {
     document.getElementById("entries-container").innerHTML = '<div class="loading">Loading...</div>';
 
     try {
-        const r = await fetch("/" + name + "/entries.jsonl?" + CACHE_VER);
+        const r = await fetch(name + "/entries.jsonl?" + CACHE_VER);
         if (r.status !== 200) throw new Error("Not found");
         const text = await r.text();
         allEntries = text.trim().split("\n").filter(l => l.trim()).map(l => JSON.parse(l));
