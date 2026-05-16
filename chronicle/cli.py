@@ -68,10 +68,32 @@ def cmd_serve(args):
     HTTPServer(("", port), Handler).serve_forever()
 
 def cmd_gc(args):
-    name = args[0] if args else "default"
+    from .gc import run_gc, run_fleet_gc
+    
+    dry_run = "--dry-run" in args
+    fleet_mode = "--fleet" in args
+    
+    if fleet_mode:
+        results = run_fleet_gc(dry_run=dry_run)
+        print(f"Fleet GC: {len(results)} agents processed")
+        return
+    
+    if not args or args[0].startswith("--"):
+        print("Usage: chronicle gc <agent> [--dry-run]")
+        return
+    
+    name = args[0]
+    prefs_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), name, "GC-Preferences.md")
     c = Chronicle(name)
-    result = c.summarize()
-    print(f"GC {name}: {result} entries")
+    result = run_gc(c, prefs_path, dry_run=dry_run)
+    
+    if dry_run:
+        print(f"DRY RUN — would keep {result['kept']}, "
+              f"would summarize {result.get('would_summarize', 0)}, "
+              f"would delete {result.get('would_delete', 0)}")
+    else:
+        print(f"GC: {result['kept']} kept, "
+              f"{result['summarized']} summarized, {result['deleted']} deleted")
     c.generate_html()
 
 def cmd_list(args):

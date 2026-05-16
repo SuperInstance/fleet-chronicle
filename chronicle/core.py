@@ -63,6 +63,13 @@ class Chronicle:
             pass
         return entries[-limit:]
 
+    def _write_all_entries(self, entries):
+        """Overwrite entries.jsonl with a list of entries."""
+        entries_file = os.path.join(self.dir, "entries.jsonl")
+        with open(entries_file, "w") as f:
+            for e in entries:
+                f.write(json.dumps(e) + "\n")
+
     def check_in(self, report, status="ok", tags=None, metadata=None):
         """File a check-in report. Returns entry ID."""
         self.count += 1

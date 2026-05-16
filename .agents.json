@@ -1,1 +1,5 @@
-["oracle1","zeroclaw"]
+[
+  "--fleet",
+  "oracle1",
+  "zeroclaw"
+]
