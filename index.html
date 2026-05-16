@@ -164,10 +164,10 @@ async function showHome() {
     window.history.pushState({}, "", "/");
 
     try {
-        const resp = await fetch(REPO_BASE + "/.agents.json");
-        if (!resp.ok) throw new Error("HTTP " + resp.status + " loading .agents.json");
+        const resp = await fetch(REPO_BASE + "/agents.json");
+        if (!resp.ok) throw new Error("HTTP " + resp.status + " loading agents.json");
         const agents = await resp.json();
-        if (!Array.isArray(agents)) throw new Error(".agents.json is not an array");
+        if (!Array.isArray(agents)) throw new Error("agents.json is not an array");
 
         let totalEntries = 0;
         let activeToday = 0;

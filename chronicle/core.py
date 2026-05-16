@@ -29,7 +29,7 @@ class Chronicle:
 
     def _register_agent(self):
         """Register this agent in the fleet index. No heartbeat needed."""
-        index_file = os.path.join(self.REPO_DIR, ".agents.json")
+        index_file = os.path.join(self.REPO_DIR, "agents.json")
         try:
             with open(index_file) as f:
                 agents = json.load(f)
