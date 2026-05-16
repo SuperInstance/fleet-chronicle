@@ -165,7 +165,9 @@ async function showHome() {
 
     try {
         const resp = await fetch(REPO_BASE + "/.agents.json");
+        if (!resp.ok) throw new Error("HTTP " + resp.status + " loading .agents.json");
         const agents = await resp.json();
+        if (!Array.isArray(agents)) throw new Error(".agents.json is not an array");
 
         let totalEntries = 0;
         let activeToday = 0;
@@ -219,7 +221,8 @@ async function showHome() {
 
     } catch(e) {
         document.getElementById("agent-list").innerHTML =
-            '<div class="error">Failed to load fleet data. <a href="/" onclick="location.reload()">Retry</a>.</div>';
+            '<div class="error">Failed to load fleet data: ' + e.message + '<br><small>Check browser console (F12) for details</small><br><button onclick="location.reload()">Retry</button></div>';
+        console.error("fleet-chronicle load error:", e);
     }
 }
 
